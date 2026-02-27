@@ -97,6 +97,7 @@ Project-scoped files:
 - Codex MCP config: `.codex/config.toml`
 - Antigravity workflow: `.agent/workflows/id8.md`
 - Antigravity rule: `.agent/rules/id8.md`
+- Project `.gitignore` block for sensitive local files (`.env`, `.mcp.json`, `.codex/config.toml`)
 - Environment template: `.env.example`
 - Installer manifest: `.id8/install-manifest.json`
 
@@ -116,7 +117,8 @@ You can configure keys in one of two ways:
    - Project Codex MCP block: `.codex/config.toml`
    - Global Antigravity MCP config (if enabled): `~/.gemini/antigravity/mcp_config.json`
 
-If you put real keys directly in project files, add those files to `.gitignore` (or otherwise ensure they are not committed).
+The installer also writes a managed `.gitignore` block covering `.env`, `.mcp.json`, and `.codex/config.toml`.
+If you put real keys directly in any other project files, add those files to `.gitignore` as well.
 
 ## Invocation After Install
 

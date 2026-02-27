@@ -151,6 +151,24 @@ class InstallWorkflowTests(unittest.TestCase):
         self.assertIn(f"{manifest['vercel']['secret_env_var']}=", content)
         self.assertIn(f"{manifest['supabase']['secret_env_var']}=", content)
 
+    def test_write_gitignore_adds_sensitive_runtime_files(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp)
+            project_dir.joinpath(".gitignore").write_text("node_modules/\n")
+            args = self._make_args(
+                project_dir=tmp,
+                agents="claude,codex",
+                validate_only=False,
+            )
+            installer = Installer(args)
+            installer._write_gitignore()
+            content = project_dir.joinpath(".gitignore").read_text()
+
+        self.assertIn("node_modules/\n", content)
+        self.assertIn(".env", content)
+        self.assertIn(".mcp.json", content)
+        self.assertIn(".codex/config.toml", content)
+
     def test_validate_only_missing_dir_does_not_create_and_reports_preview(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp, "new-project")

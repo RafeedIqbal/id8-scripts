@@ -9,10 +9,9 @@
    `generate_screen_from_text` must use `projectId` as the bare numeric ID (no `projects/` prefix). `deviceType` belongs here, not in `create_project`.
    `list_screens` must use bare `projectId` (not `parent`).
    `get_screen` may use full resource names like `projects/{project}/screens/{screen}`.
-   After every screen generation call, verify resulting screens with `list_screens` before reporting failure.
-   If a generation call returns no output, treat it as "possibly pending" and poll project/screens state before concluding failure.
+   If a generation call returns no output, treat it as "possibly pending" and continue.
    Pause after user feedback loop finishes.
-   List generated screens with IDs and provide the Stitch project link using the format `https://stitch.withgoogle.com/projects/projectID` (replace `projectID` with the actual project ID).
+   Provide the Stitch project link using the format `https://stitch.withgoogle.com/projects/projectID` (replace `projectID` with the actual project ID).
    Ask the user to export the screens they like to MCP and paste the exported code in the chat.
    Use the user-pasted exported screen code as the source of truth for implementation in following steps.
 4. Create a folder with project name, with two subfolders: one for the Vercel project and one for files needed for Supabase deployment.
@@ -42,7 +41,7 @@
    Ensure RLS is enabled for all exposed tables.
    Record Supabase URL and anon/publishable key for frontend deployment.
    Mandatory confirmation required immediately before provisioning/deployment.
-9. Deploy frontend after backend.
+9. Deploy frontend after backend. Make Vercel site name match project title.
    Before `vercel env add` or `vercel deploy`, ensure project is linked (`vercel link`) in the frontend directory.
    Inject Supabase environment variables with an idempotent flow: check existing values or remove conflicting vars before re-adding.
    Keep secrets out of logs/outputs.

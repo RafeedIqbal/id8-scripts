@@ -7,7 +7,7 @@ description: Execute the $id8 staged delivery workflow with strict step-by-step 
 
 Invocation: `{{INVOCATION}}`
 
-Execute one step at a time. After each step, request approval to proceed.
+Follow the sequence exactly. Never combine multiple steps into one response.
 
 ## Strict Step Sequence
 {{WORKFLOW_STEPS}}
@@ -20,8 +20,8 @@ Execute one step at a time. After each step, request approval to proceed.
 
 ## Execution Rules
 
-1. Never run ahead across multiple steps in one turn.
-2. Keep a visible status marker for the current step.
-3. Require explicit confirmation before mutating actions in Steps 7, 8, and 9.
-4. Stop with a clear blocker report if MCP auth is missing.
+1. Do not hallucinate tool output.
+2. Do not run Steps 7, 8, or 9 without explicit approval.
+3. If a required MCP server is not authenticated, stop and report the required login/action.
+4. If `--dry-run` is set, perform connectivity checks only.
 5. Before each MCP call, validate parameter names and types against the current tool schema.

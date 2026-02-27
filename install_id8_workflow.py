@@ -17,6 +17,8 @@ from typing import Any
 
 MARKER_START = "# >>> id8-managed:start"
 MARKER_END = "# <<< id8-managed:end"
+GITIGNORE_MARKER_START = "# >>> id8-managed:gitignore:start"
+GITIGNORE_MARKER_END = "# <<< id8-managed:gitignore:end"
 VALID_AGENTS = ("claude", "codex", "antigravity")
 VALID_AUTH_MODES = ("oauth", "key")
 
@@ -32,10 +34,16 @@ def toml_array(values: list[str]) -> str:
     return f"[{encoded}]"
 
 
-def upsert_managed_block(existing_text: str, block_text: str) -> str:
-    """Insert or replace the id8-managed TOML block."""
+def upsert_managed_block(
+    existing_text: str,
+    block_text: str,
+    *,
+    marker_start: str = MARKER_START,
+    marker_end: str = MARKER_END,
+) -> str:
+    """Insert or replace a managed text block delimited by the given markers."""
     pattern = re.compile(
-        rf"{re.escape(MARKER_START)}.*?{re.escape(MARKER_END)}\n?",
+        rf"{re.escape(marker_start)}.*?{re.escape(marker_end)}\n?",
         flags=re.DOTALL,
     )
     if pattern.search(existing_text):
@@ -300,6 +308,7 @@ class Installer:
                 )
 
         self._write_env_example()
+        self._write_gitignore()
         self._write_project_manifest()
 
     def _template_substitutions(self) -> dict[str, str]:
@@ -576,6 +585,30 @@ class Installer:
             "",
         ]
         self._write_text_file(self.project_dir / ".env.example", "\n".join(lines))
+
+    def _write_gitignore(self) -> None:
+        gitignore_entries = [
+            ".env",
+            ".mcp.json",
+            ".codex/config.toml",
+        ]
+        lines = [
+            GITIGNORE_MARKER_START,
+            "# id8 sensitive local files",
+            *gitignore_entries,
+            GITIGNORE_MARKER_END,
+            "",
+        ]
+        block = "\n".join(lines)
+        path = self.project_dir / ".gitignore"
+        existing = path.read_text() if path.exists() else ""
+        updated = upsert_managed_block(
+            existing,
+            block,
+            marker_start=GITIGNORE_MARKER_START,
+            marker_end=GITIGNORE_MARKER_END,
+        )
+        self._write_text_file(path, updated)
 
     def _write_json_mcp(
         self,
