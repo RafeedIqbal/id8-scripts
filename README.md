@@ -81,7 +81,6 @@ MCP templates include placeholders for these key variables:
 - `ID8_GITHUB_TOKEN`
 - `ID8_VERCEL_TOKEN`
 - `ID8_SUPABASE_TOKEN`
-- `ID8_CONTEXT7_API_KEY`
 - `ID8_STITCH_API_KEY`
 
 Antigravity global MCP append toggle:
@@ -98,6 +97,7 @@ Project-scoped files:
 - Codex MCP config: `.codex/config.toml`
 - Antigravity workflow: `.agent/workflows/id8.md`
 - Antigravity rule: `.agent/rules/id8.md`
+- Environment template: `.env.example`
 - Installer manifest: `.id8/install-manifest.json`
 
 Optional global file (only if confirmed for Antigravity):
@@ -106,11 +106,11 @@ Optional global file (only if confirmed for Antigravity):
 
 ## MCP Key Configuration
 
-Generated MCP configs use placeholder env vars (for example `${ID8_STITCH_API_KEY}` and `${ID8_GITHUB_TOKEN}`).
+Generated MCP configs use OAuth for Context7 and env-var placeholders for key-based servers (for example `${ID8_STITCH_API_KEY}` and `${ID8_GITHUB_TOKEN}`).
 
 You can configure keys in one of two ways:
 
-1. Set environment variables before launching your MCP client.
+1. Set environment variables before launching your MCP client (the installer writes starter values in `.env.example`).
 2. Replace placeholder values directly in the MCP config files:
    - Project Claude MCP: `.mcp.json`
    - Project Codex MCP block: `.codex/config.toml`

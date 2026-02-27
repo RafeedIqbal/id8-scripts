@@ -20,11 +20,11 @@ MARKER_END = "# <<< id8-managed:end"
 VALID_AGENTS = ("claude", "codex", "antigravity")
 VALID_AUTH_MODES = ("oauth", "key")
 
-ENV_CONTEXT7_API_KEY = "ID8_CONTEXT7_API_KEY"
 ENV_STITCH_API_KEY = "ID8_STITCH_API_KEY"
 ENV_GITHUB_TOKEN = "ID8_GITHUB_TOKEN"
 ENV_VERCEL_TOKEN = "ID8_VERCEL_TOKEN"
 ENV_SUPABASE_TOKEN = "ID8_SUPABASE_TOKEN"
+CONTEXT7_OAUTH_URL = "https://mcp.context7.com/mcp/oauth"
 
 
 def toml_string(value: str) -> str:
@@ -300,6 +300,7 @@ class Installer:
                     "Antigravity MCP append skipped; configure ~/.gemini/antigravity/mcp_config.json manually."
                 )
 
+        self._write_env_example()
         self._write_project_manifest()
 
     def _template_substitutions(self) -> dict[str, str]:
@@ -343,8 +344,7 @@ class Installer:
         entries: dict[str, dict[str, Any]] = {
             "context7": {
                 "type": "http",
-                "url": "https://mcp.context7.com/mcp",
-                "headers": {"CONTEXT7_API_KEY": self._env_placeholder(ENV_CONTEXT7_API_KEY)},
+                "url": CONTEXT7_OAUTH_URL,
             },
             "stitch": {
                 "type": "http",
@@ -384,7 +384,7 @@ class Installer:
         else:
             self.pending_auth.add("Supabase: run OAuth/browser login in your MCP client.")
 
-        self.pending_auth.add(f"Context7: set {ENV_CONTEXT7_API_KEY} before launching your MCP client.")
+        self.pending_auth.add("Context7: run OAuth/browser login in your MCP client.")
         self.pending_auth.add(f"Stitch: set {ENV_STITCH_API_KEY} before launching your MCP client.")
         self.pending_auth.add(f"GitHub: set {ENV_GITHUB_TOKEN} before launching your MCP client.")
         return entries
@@ -392,8 +392,7 @@ class Installer:
     def _build_antigravity_mcp_entries(self) -> dict[str, dict[str, Any]]:
         entries: dict[str, dict[str, Any]] = {
             "context7": {
-                "serverUrl": "https://mcp.context7.com/mcp",
-                "headers": {"CONTEXT7_API_KEY": self._env_placeholder(ENV_CONTEXT7_API_KEY)},
+                "serverUrl": CONTEXT7_OAUTH_URL,
             },
             "StitchMCP": {
                 "$typeName": "exa.cascade_plugins_pb.CascadePluginCommandTemplate",
@@ -434,7 +433,7 @@ class Installer:
             },
         }
 
-        self.pending_auth.add(f"Context7: set {ENV_CONTEXT7_API_KEY} before launching your MCP client.")
+        self.pending_auth.add("Context7: run OAuth/browser login in your MCP client.")
         self.pending_auth.add(f"Stitch: set {ENV_STITCH_API_KEY} before launching your MCP client.")
         self.pending_auth.add(f"GitHub: set {ENV_GITHUB_TOKEN} before launching your MCP client.")
         if self.vercel_auth_mode == "key":
@@ -455,9 +454,8 @@ class Installer:
         entries: dict[str, dict[str, Any]] = {
             "context7": {
                 "command": "npx",
-                "args": ["-y", "@upstash/context7-mcp"],
+                "args": self._mcp_remote_args(CONTEXT7_OAUTH_URL),
                 "enabled": True,
-                "env": {"CONTEXT7_API_KEY": self._env_placeholder(ENV_CONTEXT7_API_KEY)},
             },
             "StitchMCP": {
                 "command": "npx",
@@ -493,7 +491,7 @@ class Installer:
             },
         }
 
-        self.pending_auth.add(f"Context7: set {ENV_CONTEXT7_API_KEY} before launching your MCP client.")
+        self.pending_auth.add("Context7: run OAuth/browser login in your MCP client.")
         self.pending_auth.add(f"Stitch: set {ENV_STITCH_API_KEY} before launching your MCP client.")
         self.pending_auth.add(f"GitHub: set {ENV_GITHUB_TOKEN} before launching your MCP client.")
         if self.vercel_auth_mode == "key":
@@ -522,6 +520,28 @@ class Installer:
             },
         }
         self._write_json_file(self.project_dir / ".id8/install-manifest.json", payload)
+
+    def _write_env_example(self) -> None:
+        lines = [
+            "# id8 installer generated environment template",
+            "# Set these in your shell or copy into your project's .env file.",
+            "",
+            "# Installer behavior",
+            f"ID8_VERCEL_AUTH_MODE={self.vercel_auth_mode}",
+            f"ID8_SUPABASE_AUTH_MODE={self.supabase_auth_mode}",
+            "ID8_APPEND_ANTIGRAVITY_GLOBAL_MCP=false",
+            "",
+            "# MCP credentials",
+            "# Required",
+            "ID8_GITHUB_TOKEN=",
+            "ID8_STITCH_API_KEY=",
+            "",
+            "# Required only when *_AUTH_MODE=key",
+            "ID8_VERCEL_TOKEN=",
+            "ID8_SUPABASE_TOKEN=",
+            "",
+        ]
+        self._write_text_file(self.project_dir / ".env.example", "\n".join(lines))
 
     def _write_json_mcp(
         self,

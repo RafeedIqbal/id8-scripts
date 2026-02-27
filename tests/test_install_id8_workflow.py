@@ -1,6 +1,7 @@
 import argparse
 import tempfile
 import unittest
+from pathlib import Path
 
 from install_id8_workflow import (
     MARKER_END,
@@ -72,6 +73,13 @@ class InstallWorkflowTests(unittest.TestCase):
         for config in entries.values():
             self.assertNotEqual(config["command"], "docker")
 
+        context7 = entries["context7"]
+        self.assertEqual(
+            context7["args"],
+            ["-y", "mcp-remote", "https://mcp.context7.com/mcp/oauth"],
+        )
+        self.assertNotIn("env", context7)
+
         stitch_args = entries["StitchMCP"]["args"]
         self.assertIn("--header", stitch_args)
         self.assertIn("X-Goog-Api-Key: ${ID8_STITCH_API_KEY}", stitch_args)
@@ -85,6 +93,28 @@ class InstallWorkflowTests(unittest.TestCase):
         supabase_args = entries["supabase_mcp_server"]["args"]
         joined_supabase = " ".join(supabase_args)
         self.assertNotIn("Authorization: Bearer ${ID8_SUPABASE_TOKEN}", joined_supabase)
+
+    def test_write_env_example_includes_auth_and_key_vars(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            args = argparse.Namespace(
+                project_dir=tmp,
+                agents="codex",
+                non_interactive=True,
+                vercel_auth="key",
+                supabase_auth="oauth",
+                force=False,
+                validate_only=False,
+            )
+            installer = Installer(args)
+            installer._write_env_example()
+            content = Path(tmp, ".env.example").read_text()
+
+        self.assertIn("ID8_VERCEL_AUTH_MODE=key", content)
+        self.assertIn("ID8_SUPABASE_AUTH_MODE=oauth", content)
+        self.assertIn("ID8_GITHUB_TOKEN=", content)
+        self.assertIn("ID8_STITCH_API_KEY=", content)
+        self.assertIn("ID8_VERCEL_TOKEN=", content)
+        self.assertIn("ID8_SUPABASE_TOKEN=", content)
 
 
 if __name__ == "__main__":

@@ -2,10 +2,7 @@
   "servers": {
     "context7": {
       "id8_name": "id8_context7",
-      "url": "https://mcp.context7.com/mcp",
-      "oauth_url": "https://mcp.context7.com/mcp/oauth",
-      "header_key": "CONTEXT7_API_KEY",
-      "secret_env_var": "ID8_CONTEXT7_API_KEY"
+      "url": "https://mcp.context7.com/mcp/oauth"
     },
     "stitch": {
       "id8_name": "id8_stitch",

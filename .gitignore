@@ -38,3 +38,5 @@ pip-wheel-metadata/
 .vscode/
 .idea/
 .DS_Store
+
+testdir/
