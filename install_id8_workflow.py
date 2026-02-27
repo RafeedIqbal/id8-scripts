@@ -20,11 +20,7 @@ MARKER_END = "# <<< id8-managed:end"
 VALID_AGENTS = ("claude", "codex", "antigravity")
 VALID_AUTH_MODES = ("oauth", "key")
 
-ENV_STITCH_API_KEY = "ID8_STITCH_API_KEY"
-ENV_GITHUB_TOKEN = "ID8_GITHUB_TOKEN"
-ENV_VERCEL_TOKEN = "ID8_VERCEL_TOKEN"
-ENV_SUPABASE_TOKEN = "ID8_SUPABASE_TOKEN"
-CONTEXT7_OAUTH_URL = "https://mcp.context7.com/mcp/oauth"
+MCP_MANIFEST_RELATIVE_PATH = Path("assets/id8/mcp_manifest.json")
 
 
 def toml_string(value: str) -> str:
@@ -102,6 +98,7 @@ class Installer:
         self.backup_files: list[Path] = []
         self.warnings: list[str] = []
         self.info: list[str] = []
+        self.mcp_servers = self._load_mcp_servers()
 
         self.project_dir = self._resolve_project_dir()
         self.agents = self._resolve_agents()
@@ -145,9 +142,11 @@ class Installer:
                 f"Create missing project directory {project}?",
                 default=True,
             ):
-                if not self.args.validate_only:
+                if self.args.validate_only:
+                    self.info.append(f"[validate-only] Would create project directory: {project}")
+                else:
                     project.mkdir(parents=True, exist_ok=True)
-                self.info.append(f"Created project directory: {project}")
+                    self.info.append(f"Created project directory: {project}")
             else:
                 raise ValueError("Installer cancelled: project directory does not exist.")
         return project
@@ -312,11 +311,83 @@ class Installer:
             ).strip(),
         }
 
+    def _load_mcp_servers(self) -> dict[str, dict[str, str]]:
+        manifest_path = self.script_dir / MCP_MANIFEST_RELATIVE_PATH
+        manifest = self._load_json(manifest_path)
+        servers = manifest.get("servers")
+        if not isinstance(servers, dict):
+            raise ValueError(f"Invalid MCP manifest at {manifest_path}: missing 'servers' object.")
+
+        normalized: dict[str, dict[str, str]] = {}
+        for name in ("context7", "stitch", "github", "vercel", "supabase"):
+            server = servers.get(name)
+            if not isinstance(server, dict):
+                raise ValueError(f"Invalid MCP manifest at {manifest_path}: missing '{name}' server.")
+
+            url = server.get("url")
+            if not isinstance(url, str) or not url.strip():
+                raise ValueError(
+                    f"Invalid MCP manifest at {manifest_path}: server '{name}' has no valid 'url'."
+                )
+
+            entry: dict[str, str] = {"url": url}
+            if name != "context7":
+                header_key = server.get("header_key")
+                secret_env_var = server.get("secret_env_var")
+                if not isinstance(header_key, str) or not header_key.strip():
+                    raise ValueError(
+                        f"Invalid MCP manifest at {manifest_path}: server '{name}' has no valid "
+                        "'header_key'."
+                    )
+                if not isinstance(secret_env_var, str) or not secret_env_var.strip():
+                    raise ValueError(
+                        f"Invalid MCP manifest at {manifest_path}: server '{name}' has no valid "
+                        "'secret_env_var'."
+                    )
+                entry["header_key"] = header_key
+                entry["secret_env_var"] = secret_env_var
+
+            normalized[name] = entry
+
+        return normalized
+
+    def _mcp_url(self, server_name: str) -> str:
+        return self.mcp_servers[server_name]["url"]
+
+    def _mcp_secret_env_var(self, server_name: str) -> str:
+        return self.mcp_servers[server_name]["secret_env_var"]
+
+    def _mcp_auth_headers(self, server_name: str) -> dict[str, str]:
+        header_key = self.mcp_servers[server_name]["header_key"]
+        value = self._env_placeholder(self._mcp_secret_env_var(server_name))
+        if header_key.lower() == "authorization":
+            value = f"Bearer {value}"
+        return {header_key: value}
+
+    def _record_pending_auth(self) -> None:
+        self.pending_auth.add("Context7: run OAuth/browser login in your MCP client.")
+        self.pending_auth.add(
+            f"Stitch: set {self._mcp_secret_env_var('stitch')} before launching your MCP client."
+        )
+        self.pending_auth.add(
+            f"GitHub: set {self._mcp_secret_env_var('github')} before launching your MCP client."
+        )
+        if self.vercel_auth_mode == "key":
+            self.pending_auth.add(
+                f"Vercel: set {self._mcp_secret_env_var('vercel')} before launching your MCP client."
+            )
+        else:
+            self.pending_auth.add("Vercel: run OAuth/browser login in your MCP client.")
+        if self.supabase_auth_mode == "key":
+            self.pending_auth.add(
+                "Supabase: set "
+                + f"{self._mcp_secret_env_var('supabase')} before launching your MCP client."
+            )
+        else:
+            self.pending_auth.add("Supabase: run OAuth/browser login in your MCP client.")
+
     def _env_placeholder(self, env_var: str) -> str:
         return f"${{{env_var}}}"
-
-    def _bearer_placeholder(self, env_var: str) -> str:
-        return f"Bearer {self._env_placeholder(env_var)}"
 
     def _mcp_remote_args(
         self,
@@ -332,74 +403,61 @@ class Installer:
 
     def _vercel_headers(self) -> dict[str, str] | None:
         if self.vercel_auth_mode == "key":
-            return {"Authorization": self._bearer_placeholder(ENV_VERCEL_TOKEN)}
+            return self._mcp_auth_headers("vercel")
         return None
 
     def _supabase_headers(self) -> dict[str, str] | None:
         if self.supabase_auth_mode == "key":
-            return {"Authorization": self._bearer_placeholder(ENV_SUPABASE_TOKEN)}
+            return self._mcp_auth_headers("supabase")
         return None
 
     def _build_claude_mcp_entries(self) -> dict[str, dict[str, Any]]:
         entries: dict[str, dict[str, Any]] = {
             "context7": {
                 "type": "http",
-                "url": CONTEXT7_OAUTH_URL,
+                "url": self._mcp_url("context7"),
             },
             "stitch": {
                 "type": "http",
-                "url": "https://stitch.googleapis.com/mcp",
-                "headers": {"X-Goog-Api-Key": self._env_placeholder(ENV_STITCH_API_KEY)},
+                "url": self._mcp_url("stitch"),
+                "headers": self._mcp_auth_headers("stitch"),
             },
             "github": {
                 "type": "http",
-                "url": "https://api.githubcopilot.com/mcp/",
-                "headers": {"Authorization": self._bearer_placeholder(ENV_GITHUB_TOKEN)},
+                "url": self._mcp_url("github"),
+                "headers": self._mcp_auth_headers("github"),
             },
             "vercel": {
                 "type": "http",
-                "url": "https://mcp.vercel.com",
+                "url": self._mcp_url("vercel"),
             },
             "supabase": {
                 "type": "http",
-                "url": "https://mcp.supabase.com/mcp",
+                "url": self._mcp_url("supabase"),
             },
         }
 
         vercel_headers = self._vercel_headers()
         if vercel_headers:
             entries["vercel"]["headers"] = vercel_headers
-            self.pending_auth.add(
-                f"Vercel: set {ENV_VERCEL_TOKEN} before launching your MCP client."
-            )
-        else:
-            self.pending_auth.add("Vercel: run OAuth/browser login in your MCP client.")
 
         supabase_headers = self._supabase_headers()
         if supabase_headers:
             entries["supabase"]["headers"] = supabase_headers
-            self.pending_auth.add(
-                f"Supabase: set {ENV_SUPABASE_TOKEN} before launching your MCP client."
-            )
-        else:
-            self.pending_auth.add("Supabase: run OAuth/browser login in your MCP client.")
-
-        self.pending_auth.add("Context7: run OAuth/browser login in your MCP client.")
-        self.pending_auth.add(f"Stitch: set {ENV_STITCH_API_KEY} before launching your MCP client.")
-        self.pending_auth.add(f"GitHub: set {ENV_GITHUB_TOKEN} before launching your MCP client.")
+        self._record_pending_auth()
         return entries
 
     def _build_antigravity_mcp_entries(self) -> dict[str, dict[str, Any]]:
         entries: dict[str, dict[str, Any]] = {
             "context7": {
-                "serverUrl": CONTEXT7_OAUTH_URL,
+                "serverUrl": self._mcp_url("context7"),
             },
             "StitchMCP": {
                 "$typeName": "exa.cascade_plugins_pb.CascadePluginCommandTemplate",
                 "command": "npx",
                 "args": self._mcp_remote_args(
-                    "https://stitch.googleapis.com/mcp",
-                    headers={"X-Goog-Api-Key": self._env_placeholder(ENV_STITCH_API_KEY)},
+                    self._mcp_url("stitch"),
+                    headers=self._mcp_auth_headers("stitch"),
                 ),
                 "env": {},
             },
@@ -407,8 +465,8 @@ class Installer:
                 "$typeName": "exa.cascade_plugins_pb.CascadePluginCommandTemplate",
                 "command": "npx",
                 "args": self._mcp_remote_args(
-                    "https://api.githubcopilot.com/mcp/",
-                    headers={"Authorization": self._bearer_placeholder(ENV_GITHUB_TOKEN)},
+                    self._mcp_url("github"),
+                    headers=self._mcp_auth_headers("github"),
                 ),
                 "env": {},
                 "disabledTools": [],
@@ -417,7 +475,7 @@ class Installer:
                 "$typeName": "exa.cascade_plugins_pb.CascadePluginCommandTemplate",
                 "command": "npx",
                 "args": self._mcp_remote_args(
-                    "https://mcp.vercel.com",
+                    self._mcp_url("vercel"),
                     headers=self._vercel_headers(),
                 ),
                 "env": {},
@@ -426,57 +484,43 @@ class Installer:
                 "$typeName": "exa.cascade_plugins_pb.CascadePluginCommandTemplate",
                 "command": "npx",
                 "args": self._mcp_remote_args(
-                    "https://mcp.supabase.com/mcp",
+                    self._mcp_url("supabase"),
                     headers=self._supabase_headers(),
                 ),
                 "env": {},
             },
         }
 
-        self.pending_auth.add("Context7: run OAuth/browser login in your MCP client.")
-        self.pending_auth.add(f"Stitch: set {ENV_STITCH_API_KEY} before launching your MCP client.")
-        self.pending_auth.add(f"GitHub: set {ENV_GITHUB_TOKEN} before launching your MCP client.")
-        if self.vercel_auth_mode == "key":
-            self.pending_auth.add(
-                f"Vercel: set {ENV_VERCEL_TOKEN} before launching your MCP client."
-            )
-        else:
-            self.pending_auth.add("Vercel: run OAuth/browser login in your MCP client.")
-        if self.supabase_auth_mode == "key":
-            self.pending_auth.add(
-                f"Supabase: set {ENV_SUPABASE_TOKEN} before launching your MCP client."
-            )
-        else:
-            self.pending_auth.add("Supabase: run OAuth/browser login in your MCP client.")
+        self._record_pending_auth()
         return entries
 
     def _build_codex_mcp_entries(self) -> dict[str, dict[str, Any]]:
         entries: dict[str, dict[str, Any]] = {
             "context7": {
                 "command": "npx",
-                "args": self._mcp_remote_args(CONTEXT7_OAUTH_URL),
+                "args": self._mcp_remote_args(self._mcp_url("context7")),
                 "enabled": True,
             },
             "StitchMCP": {
                 "command": "npx",
                 "args": self._mcp_remote_args(
-                    "https://stitch.googleapis.com/mcp",
-                    headers={"X-Goog-Api-Key": self._env_placeholder(ENV_STITCH_API_KEY)},
+                    self._mcp_url("stitch"),
+                    headers=self._mcp_auth_headers("stitch"),
                 ),
                 "enabled": True,
             },
             "github_mcp_server": {
                 "command": "npx",
                 "args": self._mcp_remote_args(
-                    "https://api.githubcopilot.com/mcp/",
-                    headers={"Authorization": self._bearer_placeholder(ENV_GITHUB_TOKEN)},
+                    self._mcp_url("github"),
+                    headers=self._mcp_auth_headers("github"),
                 ),
                 "enabled": True,
             },
             "VercelMCP": {
                 "command": "npx",
                 "args": self._mcp_remote_args(
-                    "https://mcp.vercel.com",
+                    self._mcp_url("vercel"),
                     headers=self._vercel_headers(),
                 ),
                 "enabled": True,
@@ -484,28 +528,14 @@ class Installer:
             "supabase_mcp_server": {
                 "command": "npx",
                 "args": self._mcp_remote_args(
-                    "https://mcp.supabase.com/mcp",
+                    self._mcp_url("supabase"),
                     headers=self._supabase_headers(),
                 ),
                 "enabled": True,
             },
         }
 
-        self.pending_auth.add("Context7: run OAuth/browser login in your MCP client.")
-        self.pending_auth.add(f"Stitch: set {ENV_STITCH_API_KEY} before launching your MCP client.")
-        self.pending_auth.add(f"GitHub: set {ENV_GITHUB_TOKEN} before launching your MCP client.")
-        if self.vercel_auth_mode == "key":
-            self.pending_auth.add(
-                f"Vercel: set {ENV_VERCEL_TOKEN} before launching your MCP client."
-            )
-        else:
-            self.pending_auth.add("Vercel: run OAuth/browser login in your MCP client.")
-        if self.supabase_auth_mode == "key":
-            self.pending_auth.add(
-                f"Supabase: set {ENV_SUPABASE_TOKEN} before launching your MCP client."
-            )
-        else:
-            self.pending_auth.add("Supabase: run OAuth/browser login in your MCP client.")
+        self._record_pending_auth()
         return entries
 
     def _write_project_manifest(self) -> None:
@@ -522,6 +552,10 @@ class Installer:
         self._write_json_file(self.project_dir / ".id8/install-manifest.json", payload)
 
     def _write_env_example(self) -> None:
+        github_token = self._mcp_secret_env_var("github")
+        stitch_api_key = self._mcp_secret_env_var("stitch")
+        vercel_token = self._mcp_secret_env_var("vercel")
+        supabase_token = self._mcp_secret_env_var("supabase")
         lines = [
             "# id8 installer generated environment template",
             "# Set these in your shell or copy into your project's .env file.",
@@ -533,12 +567,12 @@ class Installer:
             "",
             "# MCP credentials",
             "# Required",
-            "ID8_GITHUB_TOKEN=",
-            "ID8_STITCH_API_KEY=",
+            f"{github_token}=",
+            f"{stitch_api_key}=",
             "",
             "# Required only when *_AUTH_MODE=key",
-            "ID8_VERCEL_TOKEN=",
-            "ID8_SUPABASE_TOKEN=",
+            f"{vercel_token}=",
+            f"{supabase_token}=",
             "",
         ]
         self._write_text_file(self.project_dir / ".env.example", "\n".join(lines))
