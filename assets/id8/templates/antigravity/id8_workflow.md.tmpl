@@ -1,0 +1,24 @@
+---
+description: /id8 staged workflow for PRD to verified deployment with strict confirmation gates.
+---
+
+# /id8
+
+Invocation: `{{INVOCATION}}`
+
+Run this workflow in strict sequence. Complete one step, pause, and ask for confirmation before continuing.
+
+## Strict Step Sequence
+{{WORKFLOW_STEPS}}
+
+## Dry-Run Mode
+{{DRY_RUN_CHECKS}}
+
+## Confirmation Gates
+{{CONFIRMATION_GATES}}
+
+## Safety Constraints
+
+1. Do not execute destructive or billable actions without user approval.
+2. If connectivity/auth fails for any MCP server, stop and request remediation.
+3. In dry-run mode, do not perform repository, deployment, or provisioning actions.

@@ -1,0 +1,26 @@
+---
+name: id8
+description: Execute the $id8 staged delivery workflow with strict step-by-step pauses. Use for PRD, planning, UI generation, implementation, testing, repository push, deployment, and verification via MCP tools.
+---
+
+# $id8 Workflow
+
+Invocation: `{{INVOCATION}}`
+
+Execute one step at a time. After each step, request approval to proceed.
+
+## Strict Step Sequence
+{{WORKFLOW_STEPS}}
+
+## Dry-Run Mode
+{{DRY_RUN_CHECKS}}
+
+## Confirmation Gates
+{{CONFIRMATION_GATES}}
+
+## Execution Rules
+
+1. Never run ahead across multiple steps in one turn.
+2. Keep a visible status marker for the current step.
+3. Require explicit confirmation before mutating actions in Steps 7, 8, and 9.
+4. Stop with a clear blocker report if MCP auth is missing.
