@@ -12,8 +12,16 @@ Project-only installer for `/id8` workflow assets across Claude, Codex, and Anti
 
 ## Quick Start (Interactive)
 
+The easiest way to run the installer is by running the executable script for your platform from the root of this repository:
+
+- **Windows**: Double-click `install.bat`
+- **macOS**: Double-click `install.command`
+- **Linux**: Run `./install.sh`
+
+Alternatively, you can run the Python script directly:
+
 ```bash
-python3 install_id8_workflow.py
+python3 src/install_id8_workflow.py
 ```
 
 Interactive mode will prompt you for:
@@ -29,7 +37,7 @@ Interactive mode will prompt you for:
 Use this in scripts/CI when you want predictable behavior:
 
 ```bash
-python3 install_id8_workflow.py \
+python3 src/install_id8_workflow.py \
   --non-interactive \
   --project-dir /path/to/project \
   --agents claude,codex,antigravity
@@ -45,7 +53,7 @@ In non-interactive mode:
 ## Validate-Only (Dry Install Preview)
 
 ```bash
-python3 install_id8_workflow.py \
+python3 src/install_id8_workflow.py \
   --validate-only \
   --project-dir /path/to/project \
   --agents claude,codex,antigravity
@@ -56,7 +64,7 @@ This shows what would be written without modifying files.
 ## CLI Options
 
 ```bash
-python3 install_id8_workflow.py --help
+python3 src/install_id8_workflow.py --help
 ```
 
 Supported flags:
