@@ -7,9 +7,9 @@
    If yes, ask what device type to design for and which model to use (`Gemini 3 flash` or `Gemini 3 pro`), then use Stitch MCP with strict parameter contracts:
    `create_project` accepts `title` only.
    `generate_screen_from_text` must use `projectId` as the bare numeric ID (no `projects/` prefix). `deviceType` belongs here, not in `create_project`.
-   `list_screens` must use bare `projectId` (not `parent`).
+   `list_screens` must use bare `projectId` (not `parent`), only run at the end of the design generation process and at least 3 minutes after screen generation.
    `get_screen` may use full resource names like `projects/{project}/screens/{screen}`.
-   If a generation call returns no output, treat it as "possibly pending" and continue.
+   Generation takes up to 4 minutes, if a generation call returns no output, treat it as "possibly pending" and continue.
    Pause after user feedback loop finishes.
    Provide the Stitch project link using the format `https://stitch.withgoogle.com/projects/projectID` (replace `projectID` with the actual project ID).
    Ask the user to export the screens they like to MCP and paste the exported code in the chat.
@@ -17,7 +17,8 @@
 4. The installer has already scaffolded `id8-src/` (Next.js app with recommended defaults) and `supabase/` in the project directory.
    If Supabase functionality is required, implement backend code in the `supabase/` folder using the approved tech plan and Context7 references.
    Continue
-5. Implement frontend code in the `id8-src/` folder using approved Stitch output with `get_screen` (if generated), the PRD, the tech plan, and Context7 references.
+5. Implement frontend code in the `id8-src/` folder using approved screens, the PRD, the tech plan, and Context7 references.
+   if generated, use screen data downloaded in the `screens` folder as context.
    Ensure the frontend matches the approved design and fully implements PRD features. If any features in the PRD or Tech Plan are not in the designed screens, follow the design language to implement them.
    Do not pause for confirmation during implementation unless user review is needed.
    Continue
@@ -27,22 +28,28 @@
    For Next.js 16+, use `proxy.ts` (not `middleware.ts`) and export `proxy`.
    For React `startTransition`, ensure callback returns `void` (wrap async actions as `async () => { await ... }`).
    For Tailwind v4, load external fonts via `<link>` in `layout.tsx` head, not CSS `@import url(...)`.
+   If using Material Symbols, ensure the `<link>` specifies all variable axes (opsz,wght,FILL,GRAD) and the CSS class contains all required font rendering properties.
    Run until no errors, then continue.
 7. Create a `.gitignore` file to exclude unnecessary files.
    Run a security check for secrets/keys before any push; if secrets are detected, stop and notify the user.
+   Check if any nested `.git` directories exist (e.g. `id8-src/.git`) and remove them to prevent them from being treated as git submodules.
    Check if the current directory is already in a Git repository. If not, ask if the user wants to create one for the project folder.
-   Then call GitHub MCP server (e.g., `create_repository`, `push_files`) to create repo(s) and push code when approved.
+   Call GitHub MCP server (e.g., `create_repository`) to create the repo.
+   For pushing code, try using local git commands (`git init`, `git add .`, `git commit`, `git push -u origin main --force`) if available. A force push may be required on the first push.
+   If local git commands fail or are not available, fall back to using GitHub MCP `push_files` and push code in chunks (Note: `push_files` may fail with 409 on an empty repo, so ensure an initial commit exists or handle accordingly).
    Mandatory confirmation required immediately before any repo creation/push action.
 8. If Supabase code was implemented, deploy backend first.
    Start with Supabase preflight: list organizations/projects and check plan limits before attempting `create_project`.
    If free-tier project limits block creation, present options (pause an existing project, reuse existing project, or skip deployment) and wait for user choice.
    For billing-confirmed flows, use exact parameter contracts: `get_cost` uses `organization_id` (snake_case) and `confirm_cost.amount` must be numeric.
    Then provision/deploy with Supabase MCP tools (e.g., `create_project`, `apply_migration`, `get_project_url`, `get_publishable_keys`) as needed.
+   If applying to an existing project, make sure the table names are identifiable (projectname_tablename)
    Ensure RLS is enabled for all exposed tables.
    Record Supabase URL and anon/publishable key for frontend deployment.
    Mandatory confirmation required immediately before provisioning/deployment.
 9. Deploy frontend after backend. Make Vercel site name match project title (must be lowercase).
-   Before `vercel env add` or `vercel deploy`, ensure project is linked (`vercel link`) in the `id8-src/` directory.
+   Before `vercel env add` or `vercel deploy`, ensure the project is explicitly linked to the current project and does not overwrite another project by running `npx vercel link --yes --project <project-name>` in the `id8-src/` directory. If it prompts to link to an existing unrelated project, delete `.vercel/` and re-link.
+   Ensure the Vercel project is linked to the GitHub repository for automatic deploys on push (e.g., using `npx vercel git connect` or via Vercel MCP/dashboard).
    Inject Supabase environment variables with an idempotent flow: check existing values or remove conflicting vars before re-adding.
    Keep secrets out of logs/outputs.
    Default deployment path is Vercel CLI (`npx vercel deploy --prod --yes`).

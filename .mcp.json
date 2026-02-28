@@ -1,0 +1,30 @@
+{
+  "mcpServers": {
+    "context7": {
+      "type": "http",
+      "url": "https://mcp.context7.com/mcp/oauth"
+    },
+    "github": {
+      "headers": {
+        "Authorization": "Bearer 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"
+      },
+      "type": "http",
+      "url": "https://api.githubcopilot.com/mcp/"
+    },
+    "stitch": {
+      "headers": {
+        "X-Goog-Api-Key": "AQ.Ab8RN6J-hxZ3A92e7k-vB-IgNZ6Ep_FXlIpICelqvVUYqCNOdw"
+      },
+      "type": "http",
+      "url": "https://stitch.googleapis.com/mcp"
+    },
+    "supabase": {
+      "type": "http",
+      "url": "https://mcp.supabase.com/mcp"
+    },
+    "vercel": {
+      "type": "http",
+      "url": "https://mcp.vercel.com "
+    }
+  }
+}
