@@ -14,14 +14,14 @@
    Provide the Stitch project link using the format `https://stitch.withgoogle.com/projects/projectID` (replace `projectID` with the actual project ID).
    Ask the user to export the screens they like to MCP and paste the exported code in the chat.
    Use the user-pasted exported screen code as the source of truth for implementation in following steps. Save exported screen data to `screens` folder.
-4. Create a folder with project name, with two subfolders: one for the Vercel project and one for files needed for Supabase deployment.
-   If Supabase functionality is required, implement backend code in the Supabase folder using the approved tech plan and Context7 references.
+4. The installer has already scaffolded `id8-src/` (Next.js app with recommended defaults) and `supabase/` in the project directory.
+   If Supabase functionality is required, implement backend code in the `supabase/` folder using the approved tech plan and Context7 references.
    Continue
-5. Implement frontend code in the frontend folder using approved Stitch output with `get_screen` (if generated), the PRD, the tech plan, and Context7 references.
+5. Implement frontend code in the `id8-src/` folder using approved Stitch output with `get_screen` (if generated), the PRD, the tech plan, and Context7 references.
    Ensure the frontend matches the approved design and fully implements PRD features. If any features in the PRD or Tech Plan are not in the designed screens, follow the design language to implement them.
    Do not pause for confirmation during implementation unless user review is needed.
    Continue
-6. Run frontend locally and fix issues until clean. Run backend tests/checks when relevant.
+6. Run the frontend locally from `id8-src/` and fix issues until clean. Run backend tests/checks when relevant.
    Run both development and production-grade checks (build/typecheck) to catch deploy-only failures.
    Apply framework guardrails during fixes:
    For Next.js 16+, use `proxy.ts` (not `middleware.ts`) and export `proxy`.
@@ -42,7 +42,7 @@
    Record Supabase URL and anon/publishable key for frontend deployment.
    Mandatory confirmation required immediately before provisioning/deployment.
 9. Deploy frontend after backend. Make Vercel site name match project title (must be lowercase).
-   Before `vercel env add` or `vercel deploy`, ensure project is linked (`vercel link`) in the frontend directory.
+   Before `vercel env add` or `vercel deploy`, ensure project is linked (`vercel link`) in the `id8-src/` directory.
    Inject Supabase environment variables with an idempotent flow: check existing values or remove conflicting vars before re-adding.
    Keep secrets out of logs/outputs.
    Default deployment path is Vercel CLI (`npx vercel deploy --prod --yes`).

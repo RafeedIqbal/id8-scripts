@@ -124,9 +124,53 @@ class Installer:
 
     def run(self) -> int:
         self._check_dependencies()
+        self._scaffold_project()
         self._write_assets()
         self._print_report()
         return 0
+
+    def _scaffold_project(self) -> None:
+        """Create id8-src/ (scaffolded Next.js app) and supabase/ in the project directory."""
+        src_dir = self.project_dir / "id8-src"
+        supabase_dir = self.project_dir / "supabase"
+
+        if self.args.validate_only:
+            self.info.append(f"[validate-only] Would create directory: {supabase_dir}")
+        elif not supabase_dir.exists():
+            supabase_dir.mkdir(parents=True, exist_ok=True)
+            self.info.append(f"Created directory: {supabase_dir}")
+
+        if src_dir.exists() and any(src_dir.iterdir()):
+            self.info.append(f"Skipped Next.js scaffold: {src_dir} is not empty.")
+            return
+
+        if not command_exists("npx"):
+            self.warnings.append("npx not found; skipping Next.js scaffold.")
+            self.manual_setup.append(
+                f"Run `npx create-next-app@latest id8-src --yes` in {self.project_dir} to scaffold the frontend."
+            )
+            return
+
+        if self.args.validate_only:
+            self.info.append(
+                f"[validate-only] Would run: npx create-next-app@latest id8-src --yes in {self.project_dir}"
+            )
+            return
+
+        print(f"\nScaffolding Next.js app in {src_dir}...")
+        result = subprocess.run(
+            ["npx", "create-next-app@latest", "id8-src", "--yes"],
+            cwd=self.project_dir,
+        )
+        if result.returncode == 0:
+            self.info.append(f"Scaffolded Next.js app at {src_dir}")
+        else:
+            self.warnings.append(
+                f"create-next-app exited with code {result.returncode}; check output above."
+            )
+            self.manual_setup.append(
+                f"Run `npx create-next-app@latest id8-src --yes` in {self.project_dir} to scaffold the frontend."
+            )
 
     def _resolve_project_dir(self) -> Path:
         if self.args.project_dir:
