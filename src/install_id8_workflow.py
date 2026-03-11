@@ -116,11 +116,6 @@ class Installer:
             arg_value=self.args.vercel_auth,
             env_var="ID8_VERCEL_AUTH_MODE",
         )
-        self.supabase_auth_mode = self._resolve_auth_mode(
-            service_name="Supabase",
-            arg_value=self.args.supabase_auth,
-            env_var="ID8_SUPABASE_AUTH_MODE",
-        )
 
     def run(self) -> int:
         self._check_dependencies()
@@ -130,15 +125,8 @@ class Installer:
         return 0
 
     def _scaffold_project(self) -> None:
-        """Create id8-src/ (scaffolded Next.js app) and supabase/ in the project directory."""
+        """Create id8-src/ (scaffolded Next.js app) in the project directory."""
         src_dir = self.project_dir / "id8-src"
-        supabase_dir = self.project_dir / "supabase"
-
-        if self.args.validate_only:
-            self.info.append(f"[validate-only] Would create directory: {supabase_dir}")
-        elif not supabase_dir.exists():
-            supabase_dir.mkdir(parents=True, exist_ok=True)
-            self.info.append(f"Created directory: {supabase_dir}")
 
         if src_dir.exists() and any(src_dir.iterdir()):
             self.info.append(f"Skipped Next.js scaffold: {src_dir} is not empty.")
@@ -372,7 +360,7 @@ class Installer:
             raise ValueError(f"Invalid MCP manifest at {manifest_path}: missing 'servers' object.")
 
         normalized: dict[str, dict[str, str]] = {}
-        for name in ("context7", "stitch", "github", "vercel", "supabase"):
+        for name in ("context7", "stitch", "github", "vercel"):
             server = servers.get(name)
             if not isinstance(server, dict):
                 raise ValueError(f"Invalid MCP manifest at {manifest_path}: missing '{name}' server.")
@@ -431,13 +419,6 @@ class Installer:
             )
         else:
             self.pending_auth.add("Vercel: run OAuth/browser login in your MCP client.")
-        if self.supabase_auth_mode == "key":
-            self.pending_auth.add(
-                "Supabase: set "
-                + f"{self._mcp_secret_env_var('supabase')} before launching your MCP client."
-            )
-        else:
-            self.pending_auth.add("Supabase: run OAuth/browser login in your MCP client.")
 
     def _env_placeholder(self, env_var: str) -> str:
         return f"${{{env_var}}}"
@@ -457,11 +438,6 @@ class Installer:
     def _vercel_headers(self) -> dict[str, str] | None:
         if self.vercel_auth_mode == "key":
             return self._mcp_auth_headers("vercel")
-        return None
-
-    def _supabase_headers(self) -> dict[str, str] | None:
-        if self.supabase_auth_mode == "key":
-            return self._mcp_auth_headers("supabase")
         return None
 
     def _build_claude_mcp_entries(self) -> dict[str, dict[str, Any]]:
@@ -484,19 +460,12 @@ class Installer:
                 "type": "http",
                 "url": self._mcp_url("vercel"),
             },
-            "supabase": {
-                "type": "http",
-                "url": self._mcp_url("supabase"),
-            },
         }
 
         vercel_headers = self._vercel_headers()
         if vercel_headers:
             entries["vercel"]["headers"] = vercel_headers
 
-        supabase_headers = self._supabase_headers()
-        if supabase_headers:
-            entries["supabase"]["headers"] = supabase_headers
         self._record_pending_auth()
         return entries
 
@@ -530,15 +499,6 @@ class Installer:
                 "args": self._mcp_remote_args(
                     self._mcp_url("vercel"),
                     headers=self._vercel_headers(),
-                ),
-                "env": {},
-            },
-            "supabase-mcp-server": {
-                "$typeName": "exa.cascade_plugins_pb.CascadePluginCommandTemplate",
-                "command": "npx",
-                "args": self._mcp_remote_args(
-                    self._mcp_url("supabase"),
-                    headers=self._supabase_headers(),
                 ),
                 "env": {},
             },
@@ -578,14 +538,6 @@ class Installer:
                 ),
                 "enabled": True,
             },
-            "supabase_mcp_server": {
-                "command": "npx",
-                "args": self._mcp_remote_args(
-                    self._mcp_url("supabase"),
-                    headers=self._supabase_headers(),
-                ),
-                "enabled": True,
-            },
         }
 
         self._record_pending_auth()
@@ -599,7 +551,6 @@ class Installer:
             "installed_at": datetime.now(timezone.utc).isoformat(),
             "auth_modes": {
                 "vercel": self.vercel_auth_mode,
-                "supabase": self.supabase_auth_mode,
             },
         }
         self._write_json_file(self.project_dir / ".id8/install-manifest.json", payload)
@@ -608,14 +559,12 @@ class Installer:
         github_token = self._mcp_secret_env_var("github")
         stitch_api_key = self._mcp_secret_env_var("stitch")
         vercel_token = self._mcp_secret_env_var("vercel")
-        supabase_token = self._mcp_secret_env_var("supabase")
         lines = [
             "# id8 installer generated environment template",
             "# Set these in your shell or copy into your project's .env file.",
             "",
             "# Installer behavior",
             f"ID8_VERCEL_AUTH_MODE={self.vercel_auth_mode}",
-            f"ID8_SUPABASE_AUTH_MODE={self.supabase_auth_mode}",
             "ID8_APPEND_ANTIGRAVITY_GLOBAL_MCP=false",
             "",
             "# MCP credentials",
@@ -623,9 +572,8 @@ class Installer:
             f"{github_token}=",
             f"{stitch_api_key}=",
             "",
-            "# Required only when *_AUTH_MODE=key",
+            "# Required only when ID8_VERCEL_AUTH_MODE=key",
             f"{vercel_token}=",
-            f"{supabase_token}=",
             "",
         ]
         self._write_text_file(self.project_dir / ".env.example", "\n".join(lines))
@@ -763,7 +711,6 @@ class Installer:
             + ("enabled" if self.antigravity_global_append else "disabled")
         )
         print(f"- Vercel auth mode: {self.vercel_auth_mode}")
-        print(f"- Supabase auth mode: {self.supabase_auth_mode}")
 
         if self.changed_files:
             print("- Files written:")
@@ -823,11 +770,6 @@ def build_parser() -> argparse.ArgumentParser:
         "--vercel-auth",
         choices=VALID_AUTH_MODES,
         help="Vercel MCP auth mode: oauth or key.",
-    )
-    parser.add_argument(
-        "--supabase-auth",
-        choices=VALID_AUTH_MODES,
-        help="Supabase MCP auth mode: oauth or key.",
     )
     parser.add_argument(
         "--force",

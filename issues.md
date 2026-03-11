@@ -50,19 +50,7 @@ npx vercel link --yes --project wealthsimple-submission
 
 ---
 
-## 5. Supabase Free-Tier Project Limit Reached
-
-**What happened:** Attempted to create a new Supabase project for WealthSimple, but the org had already hit the 2-project free-tier cap:
-```
-The following organization members have reached their maximum limits
-for the number of active free projects... (2 project limit)
-```
-
-**Fix:** User chose to reuse the existing "ID8 Task App" project. Applied the WealthSimple migration (`accounts`, `transactions`, `budgets` tables with RLS) into that project using `apply_migration`.
-
----
-
-## 6. Material Symbols Icons Rendering as Raw Text
+## 5. Material Symbols Icons Rendering as Raw Text
 
 **What happened:** On the deployed site, Material Symbols icons showed as their raw text names (e.g., `account_balance_wallet`, `arrow_forward`, `lock`) instead of rendering as glyphs.
 

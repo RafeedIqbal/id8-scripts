@@ -2,7 +2,7 @@
 
 **From prompt to deployed product in one conversation.**
 
-id8 (ideate) is a multi-agent workflow that turns a single idea into a fully deployed full-stack application — complete with AI-generated designs, a Next.js frontend on Vercel, and a Supabase backend — all orchestrated through your AI coding agent of choice.
+id8 (ideate) is a multi-agent workflow that turns a single idea into a fully deployed application — complete with AI-generated designs and a Next.js frontend on Vercel — all orchestrated through your AI coding agent of choice.
 
 This repository is the installer. Run it against any project directory to provision the `/id8` workflow for **Claude Code**, **Codex**, or **Antigravity**.
 
@@ -10,22 +10,21 @@ This repository is the installer. Run it against any project directory to provis
 
 ## How It Works
 
-id8 orchestrates a 10-step pipeline with confirmation gates at every critical juncture:
+id8 orchestrates a 9-step pipeline with confirmation gates at every critical juncture:
 
 | Step | What happens | Tools used |
 |------|-------------|------------|
 | **1. PRD** | Generates a structured product requirements doc from your prompt | Agent |
-| **2. Tech Plan** | Creates an implementation plan scoped to Vercel + Supabase | Context7 MCP |
+| **2. Tech Plan** | Creates an implementation plan scoped to Vercel | Context7 MCP |
 | **3. Design** | Produces UI screens via AI (optional) | Stitch MCP |
-| **4. Scaffold** | Sets up Next.js frontend + Supabase backend structure | Agent |
-| **5. Implement** | Writes full-stack code from screens, PRD, and tech plan | Agent + Context7 |
+| **4. Scaffold** | Sets up Next.js frontend structure | Agent |
+| **5. Implement** | Writes frontend code from screens, PRD, and tech plan | Agent + Context7 |
 | **6. Test** | Runs dev and production builds locally, fixes issues | Agent |
 | **7. Git** | Creates repo, runs secret scan, pushes code | GitHub MCP |
-| **8. Backend** | Deploys Supabase project, applies migrations, enables RLS | Supabase MCP |
-| **9. Frontend** | Deploys to Vercel, wires environment variables | Vercel MCP/CLI |
-| **10. Verify** | Smoke-tests live deployment, publishes completion report | Agent |
+| **8. Frontend** | Deploys to Vercel, wires environment variables | Vercel MCP/CLI |
+| **9. Verify** | Smoke-tests live deployment, publishes completion report | Agent |
 
-Steps 7-9 require explicit user confirmation before executing.
+Steps 7-8 require explicit user confirmation before executing.
 
 ---
 
@@ -52,7 +51,7 @@ python3 src/install_id8_workflow.py
 The interactive installer will ask for:
 1. Target project directory
 2. Which agents to configure (`claude`, `codex`, `antigravity`)
-3. Auth mode for Vercel and Supabase (`oauth` or `key`)
+3. Auth mode for Vercel (`oauth` or `key`)
 
 ### 3. Set up your API keys
 
@@ -62,7 +61,6 @@ Copy the generated `.env.example` to `.env` in your project and fill in your key
 ID8_GITHUB_TOKEN=ghp_...
 ID8_STITCH_API_KEY=...
 ID8_VERCEL_TOKEN=...        # only if using key-based auth
-ID8_SUPABASE_TOKEN=...      # only if using key-based auth
 ```
 
 ### 4. Launch the workflow
@@ -91,7 +89,6 @@ python3 src/install_id8_workflow.py [OPTIONS]
 | `--agents <list>` | Comma-separated: `claude`, `codex`, `antigravity` |
 | `--non-interactive` | No prompts — suitable for CI |
 | `--vercel-auth oauth\|key` | Vercel MCP auth mode |
-| `--supabase-auth oauth\|key` | Supabase MCP auth mode |
 | `--force` | Create project directory if it doesn't exist |
 | `--validate-only` | Preview what would be written without modifying files |
 
@@ -102,8 +99,7 @@ python3 src/install_id8_workflow.py \
   --non-interactive \
   --project-dir ~/projects/my-app \
   --agents claude,codex \
-  --vercel-auth oauth \
-  --supabase-auth oauth
+  --vercel-auth oauth
 ```
 
 ### Environment variable overrides
@@ -111,7 +107,6 @@ python3 src/install_id8_workflow.py \
 | Variable | Purpose |
 |----------|---------|
 | `ID8_VERCEL_AUTH_MODE` | Override Vercel auth mode (`oauth` or `key`) |
-| `ID8_SUPABASE_AUTH_MODE` | Override Supabase auth mode (`oauth` or `key`) |
 | `ID8_APPEND_ANTIGRAVITY_GLOBAL_MCP` | Auto-append global MCP config for Antigravity (`true`/`false`) |
 
 ---
@@ -139,7 +134,7 @@ Only files for selected agents are written. All writes are idempotent — re-run
 
 ## MCP Servers
 
-id8 connects to five MCP servers to power the full workflow:
+id8 connects to four MCP servers to power the full workflow:
 
 | Server | Purpose | Auth |
 |--------|---------|------|
@@ -147,7 +142,6 @@ id8 connects to five MCP servers to power the full workflow:
 | **Stitch** | AI UI design generation | API key |
 | **GitHub** | Repository creation and code push | API key |
 | **Vercel** | Frontend deployment | OAuth or API key |
-| **Supabase** | Backend deployment and database management | OAuth or API key |
 
 Detailed setup guides for each server are in [`src/Docs/MCP_Docs/`](src/Docs/MCP_Docs/).
 

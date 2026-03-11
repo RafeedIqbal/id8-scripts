@@ -21,12 +21,6 @@
       "url": "https://mcp.vercel.com",
       "header_key": "Authorization",
       "secret_env_var": "ID8_VERCEL_TOKEN"
-    },
-    "supabase": {
-      "id8_name": "id8_supabase",
-      "url": "https://mcp.supabase.com/mcp",
-      "header_key": "Authorization",
-      "secret_env_var": "ID8_SUPABASE_TOKEN"
     }
   }
 }
