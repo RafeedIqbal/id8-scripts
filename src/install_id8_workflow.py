@@ -154,16 +154,22 @@ class Installer:
                 f"Run `npx create-next-app@latest id8-src --yes` in {self.project_dir} to scaffold the frontend."
             )
 
+    @staticmethod
+    def _strip_quotes(value: str) -> str:
+        """Strip matching surrounding quotes from a string."""
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
+            return value[1:-1]
+        return value
+
     def _resolve_project_dir(self) -> Path:
         if self.args.project_dir:
-            project = Path(self.args.project_dir).expanduser().resolve()
+            project = Path(self._strip_quotes(self.args.project_dir)).expanduser().resolve()
         elif self.args.non_interactive:
             raise ValueError("--project-dir is required when --non-interactive is set")
         else:
-            entered = input(
-                f"Project directory [{Path.cwd()}]: "
-            ).strip() or str(Path.cwd())
-            project = Path(entered).expanduser().resolve()
+            default_dir = Path.home()
+            entered = self._strip_quotes(input(f"Project directory [{default_dir}]: ").strip())
+            project = Path(entered or str(default_dir)).expanduser().resolve()
 
         if project.exists() and not project.is_dir():
             raise ValueError(f"Project path is not a directory: {project}")
