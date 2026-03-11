@@ -20,7 +20,6 @@ MARKER_END = "# <<< id8-managed:end"
 GITIGNORE_MARKER_START = "# >>> id8-managed:gitignore:start"
 GITIGNORE_MARKER_END = "# <<< id8-managed:gitignore:end"
 VALID_AGENTS = ("claude", "codex", "antigravity")
-VALID_AUTH_MODES = ("oauth", "key")
 
 MCP_MANIFEST_RELATIVE_PATH = Path("assets/id8/mcp_manifest.json")
 
@@ -111,11 +110,6 @@ class Installer:
         self.project_dir = self._resolve_project_dir()
         self.agents = self._resolve_agents()
         self.antigravity_global_append = self._resolve_antigravity_global_append()
-        self.vercel_auth_mode = self._resolve_auth_mode(
-            service_name="Vercel",
-            arg_value=self.args.vercel_auth,
-            env_var="ID8_VERCEL_AUTH_MODE",
-        )
 
     def run(self) -> int:
         self._check_dependencies()
@@ -222,36 +216,6 @@ class Installer:
             return parse_agents(self.args.agents)
         return self.agents if hasattr(self, "agents") else []
 
-    def _resolve_auth_mode(
-        self,
-        *,
-        service_name: str,
-        arg_value: str | None,
-        env_var: str,
-    ) -> str:
-        if arg_value is not None:
-            return self._validate_auth_mode(arg_value, source=f"--{service_name.lower()}-auth")
-
-        env_value = os.getenv(env_var, "").strip().lower()
-        if env_value:
-            return self._validate_auth_mode(env_value, source=env_var)
-
-        if self.args.non_interactive:
-            return "oauth"
-
-        return self._ask_choice(
-            f"{service_name} auth mode",
-            options=VALID_AUTH_MODES,
-            default="oauth",
-        )
-
-    def _validate_auth_mode(self, value: str, *, source: str) -> str:
-        normalized = value.strip().lower()
-        if normalized not in VALID_AUTH_MODES:
-            allowed = ", ".join(VALID_AUTH_MODES)
-            raise ValueError(f"Invalid auth mode '{value}' from {source}. Expected one of: {allowed}")
-        return normalized
-
     def _check_dependencies(self) -> None:
         if "claude" in self.agents and not command_exists("claude"):
             self.warnings.append("Claude CLI not found in PATH.")
@@ -261,6 +225,13 @@ class Installer:
             self._offer_install("codex")
         if not command_exists("python3") and not command_exists("python"):
             self.warnings.append("Python runtime not found in PATH.")
+        if not command_exists("gh"):
+            self.warnings.append("GitHub CLI (gh) not found in PATH. Required for repository operations.")
+            self.manual_setup.append("Install GitHub CLI: https://cli.github.com/")
+        if not command_exists("supabase"):
+            self.info.append(
+                "Supabase CLI not found. Install with `npm install -g supabase` if your project needs a backend."
+            )
 
     def _offer_install(self, tool: str) -> None:
         npm_ok = command_exists("npm")
@@ -360,7 +331,7 @@ class Installer:
             raise ValueError(f"Invalid MCP manifest at {manifest_path}: missing 'servers' object.")
 
         normalized: dict[str, dict[str, str]] = {}
-        for name in ("context7", "stitch", "github", "vercel"):
+        for name in ("context7", "stitch"):
             server = servers.get(name)
             if not isinstance(server, dict):
                 raise ValueError(f"Invalid MCP manifest at {manifest_path}: missing '{name}' server.")
@@ -410,15 +381,9 @@ class Installer:
         self.pending_auth.add(
             f"Stitch: set {self._mcp_secret_env_var('stitch')} before launching your MCP client."
         )
-        self.pending_auth.add(
-            f"GitHub: set {self._mcp_secret_env_var('github')} before launching your MCP client."
-        )
-        if self.vercel_auth_mode == "key":
-            self.pending_auth.add(
-                f"Vercel: set {self._mcp_secret_env_var('vercel')} before launching your MCP client."
-            )
-        else:
-            self.pending_auth.add("Vercel: run OAuth/browser login in your MCP client.")
+        self.pending_auth.add("GitHub: authenticate via `gh auth login`.")
+        self.pending_auth.add("Vercel: authenticate via `npx vercel login`.")
+        self.pending_auth.add("Supabase: authenticate via `supabase login` (if needed).")
 
     def _env_placeholder(self, env_var: str) -> str:
         return f"${{{env_var}}}"
@@ -435,11 +400,6 @@ class Installer:
                 args += ["--header", f"{key}: {value}"]
         return args
 
-    def _vercel_headers(self) -> dict[str, str] | None:
-        if self.vercel_auth_mode == "key":
-            return self._mcp_auth_headers("vercel")
-        return None
-
     def _build_claude_mcp_entries(self) -> dict[str, dict[str, Any]]:
         entries: dict[str, dict[str, Any]] = {
             "context7": {
@@ -451,20 +411,7 @@ class Installer:
                 "url": self._mcp_url("stitch"),
                 "headers": self._mcp_auth_headers("stitch"),
             },
-            "github": {
-                "type": "http",
-                "url": self._mcp_url("github"),
-                "headers": self._mcp_auth_headers("github"),
-            },
-            "vercel": {
-                "type": "http",
-                "url": self._mcp_url("vercel"),
-            },
         }
-
-        vercel_headers = self._vercel_headers()
-        if vercel_headers:
-            entries["vercel"]["headers"] = vercel_headers
 
         self._record_pending_auth()
         return entries
@@ -480,25 +427,6 @@ class Installer:
                 "args": self._mcp_remote_args(
                     self._mcp_url("stitch"),
                     headers=self._mcp_auth_headers("stitch"),
-                ),
-                "env": {},
-            },
-            "github-mcp-server": {
-                "$typeName": "exa.cascade_plugins_pb.CascadePluginCommandTemplate",
-                "command": "npx",
-                "args": self._mcp_remote_args(
-                    self._mcp_url("github"),
-                    headers=self._mcp_auth_headers("github"),
-                ),
-                "env": {},
-                "disabledTools": [],
-            },
-            "VercelMCP": {
-                "$typeName": "exa.cascade_plugins_pb.CascadePluginCommandTemplate",
-                "command": "npx",
-                "args": self._mcp_remote_args(
-                    self._mcp_url("vercel"),
-                    headers=self._vercel_headers(),
                 ),
                 "env": {},
             },
@@ -522,22 +450,6 @@ class Installer:
                 ),
                 "enabled": True,
             },
-            "github_mcp_server": {
-                "command": "npx",
-                "args": self._mcp_remote_args(
-                    self._mcp_url("github"),
-                    headers=self._mcp_auth_headers("github"),
-                ),
-                "enabled": True,
-            },
-            "VercelMCP": {
-                "command": "npx",
-                "args": self._mcp_remote_args(
-                    self._mcp_url("vercel"),
-                    headers=self._vercel_headers(),
-                ),
-                "enabled": True,
-            },
         }
 
         self._record_pending_auth()
@@ -549,31 +461,25 @@ class Installer:
             "agents": self.agents,
             "antigravity_global_mcp_appended": self.antigravity_global_append,
             "installed_at": datetime.now(timezone.utc).isoformat(),
-            "auth_modes": {
-                "vercel": self.vercel_auth_mode,
-            },
         }
         self._write_json_file(self.project_dir / ".id8/install-manifest.json", payload)
 
     def _write_env_example(self) -> None:
-        github_token = self._mcp_secret_env_var("github")
         stitch_api_key = self._mcp_secret_env_var("stitch")
-        vercel_token = self._mcp_secret_env_var("vercel")
         lines = [
             "# id8 installer generated environment template",
             "# Set these in your shell or copy into your project's .env file.",
             "",
             "# Installer behavior",
-            f"ID8_VERCEL_AUTH_MODE={self.vercel_auth_mode}",
             "ID8_APPEND_ANTIGRAVITY_GLOBAL_MCP=false",
             "",
             "# MCP credentials",
-            "# Required",
-            f"{github_token}=",
             f"{stitch_api_key}=",
             "",
-            "# Required only when ID8_VERCEL_AUTH_MODE=key",
-            f"{vercel_token}=",
+            "# CLI auth (run these commands to authenticate)",
+            "# gh auth login",
+            "# npx vercel login",
+            "# supabase login",
             "",
         ]
         self._write_text_file(self.project_dir / ".env.example", "\n".join(lines))
@@ -710,7 +616,6 @@ class Installer:
             "- Antigravity global MCP append: "
             + ("enabled" if self.antigravity_global_append else "disabled")
         )
-        print(f"- Vercel auth mode: {self.vercel_auth_mode}")
 
         if self.changed_files:
             print("- Files written:")
@@ -765,11 +670,6 @@ def build_parser() -> argparse.ArgumentParser:
         "--non-interactive",
         action="store_true",
         help="Disable prompts; auth modes are taken from flags/env or default to oauth.",
-    )
-    parser.add_argument(
-        "--vercel-auth",
-        choices=VALID_AUTH_MODES,
-        help="Vercel MCP auth mode: oauth or key.",
     )
     parser.add_argument(
         "--force",

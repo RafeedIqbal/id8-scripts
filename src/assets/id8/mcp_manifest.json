@@ -1,26 +1,12 @@
 {
   "servers": {
     "context7": {
-      "id8_name": "id8_context7",
       "url": "https://mcp.context7.com/mcp/oauth"
     },
     "stitch": {
-      "id8_name": "id8_stitch",
       "url": "https://stitch.googleapis.com/mcp",
       "header_key": "X-Goog-Api-Key",
       "secret_env_var": "ID8_STITCH_API_KEY"
-    },
-    "github": {
-      "id8_name": "id8_github",
-      "url": "https://api.githubcopilot.com/mcp/",
-      "header_key": "Authorization",
-      "secret_env_var": "ID8_GITHUB_TOKEN"
-    },
-    "vercel": {
-      "id8_name": "id8_vercel",
-      "url": "https://mcp.vercel.com",
-      "header_key": "Authorization",
-      "secret_env_var": "ID8_VERCEL_TOKEN"
     }
   }
 }

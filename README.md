@@ -20,8 +20,8 @@ id8 orchestrates a 9-step pipeline with confirmation gates at every critical jun
 | **4. Scaffold** | Sets up Next.js frontend structure | Agent |
 | **5. Implement** | Writes frontend code from screens, PRD, and tech plan | Agent + Context7 |
 | **6. Test** | Runs dev and production builds locally, fixes issues | Agent |
-| **7. Git** | Creates repo, runs secret scan, pushes code | GitHub MCP |
-| **8. Frontend** | Deploys to Vercel, wires environment variables | Vercel MCP/CLI |
+| **7. Git** | Creates repo, runs secret scan, pushes code | GitHub CLI (`gh`) |
+| **8. Frontend** | Deploys to Vercel, wires environment variables | Vercel CLI |
 | **9. Verify** | Smoke-tests live deployment, publishes completion report | Agent |
 
 Steps 7-8 require explicit user confirmation before executing.
@@ -51,16 +51,21 @@ python3 src/install_id8_workflow.py
 The interactive installer will ask for:
 1. Target project directory
 2. Which agents to configure (`claude`, `codex`, `antigravity`)
-3. Auth mode for Vercel (`oauth` or `key`)
 
-### 3. Set up your API keys
+### 3. Authenticate CLIs and set API keys
 
-Copy the generated `.env.example` to `.env` in your project and fill in your keys:
+Copy the generated `.env.example` to `.env` in your project and fill in your Stitch key:
 
 ```
-ID8_GITHUB_TOKEN=ghp_...
 ID8_STITCH_API_KEY=...
-ID8_VERCEL_TOKEN=...        # only if using key-based auth
+```
+
+Then authenticate the CLIs you'll need:
+
+```bash
+gh auth login          # GitHub
+npx vercel login       # Vercel
+supabase login         # Supabase (if your project needs a backend)
 ```
 
 ### 4. Launch the workflow
@@ -73,7 +78,7 @@ Open your project in your agent and invoke:
 | Codex | `$id8` |
 | Antigravity | `/id8` |
 
-Append `--dry-run` to test MCP connectivity without building anything.
+Append `--dry-run` to test MCP connectivity and CLI auth without building anything.
 
 ---
 
@@ -88,7 +93,6 @@ python3 src/install_id8_workflow.py [OPTIONS]
 | `--project-dir <path>` | Target project directory |
 | `--agents <list>` | Comma-separated: `claude`, `codex`, `antigravity` |
 | `--non-interactive` | No prompts — suitable for CI |
-| `--vercel-auth oauth\|key` | Vercel MCP auth mode |
 | `--force` | Create project directory if it doesn't exist |
 | `--validate-only` | Preview what would be written without modifying files |
 
@@ -98,15 +102,13 @@ python3 src/install_id8_workflow.py [OPTIONS]
 python3 src/install_id8_workflow.py \
   --non-interactive \
   --project-dir ~/projects/my-app \
-  --agents claude,codex \
-  --vercel-auth oauth
+  --agents claude,codex
 ```
 
 ### Environment variable overrides
 
 | Variable | Purpose |
 |----------|---------|
-| `ID8_VERCEL_AUTH_MODE` | Override Vercel auth mode (`oauth` or `key`) |
 | `ID8_APPEND_ANTIGRAVITY_GLOBAL_MCP` | Auto-append global MCP config for Antigravity (`true`/`false`) |
 
 ---
@@ -132,18 +134,17 @@ Only files for selected agents are written. All writes are idempotent — re-run
 
 ---
 
-## MCP Servers
+## MCP Servers and CLIs
 
-id8 connects to four MCP servers to power the full workflow:
+id8 uses a mix of MCP servers and CLI tools:
 
-| Server | Purpose | Auth |
-|--------|---------|------|
-| **Context7** | Library documentation lookup | OAuth |
-| **Stitch** | AI UI design generation | API key |
-| **GitHub** | Repository creation and code push | API key |
-| **Vercel** | Frontend deployment | OAuth or API key |
-
-Detailed setup guides for each server are in [`src/Docs/MCP_Docs/`](src/Docs/MCP_Docs/).
+| Tool | Purpose | Auth |
+|------|---------|------|
+| **Context7** (MCP) | Library documentation lookup | OAuth |
+| **Stitch** (MCP) | AI UI design generation | API key |
+| **GitHub CLI** (`gh`) | Repository creation and code push | `gh auth login` |
+| **Vercel CLI** | Frontend deployment | `npx vercel login` |
+| **Supabase CLI** | Backend/database (optional) | `supabase login` |
 
 ---
 
@@ -156,6 +157,9 @@ Detailed setup guides for each server are in [`src/Docs/MCP_Docs/`](src/Docs/MCP
   - Antigravity — Google's Cascade agent
 - **npm/npx** — for Next.js scaffolding during the workflow
 - **git** — for repository operations
+- **GitHub CLI** (`gh`) — for creating repositories
+- **Vercel CLI** — for deployment (used via npx)
+- **Supabase CLI** (optional) — for backend/database setup
 
 ---
 
